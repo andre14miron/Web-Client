@@ -65,21 +65,19 @@ int main(int argc, char *argv[])
             password[strlen(password) - 1] = '\0';
 
             /* Create the JSON object */
-            JSON_Value *init_object;
-            JSON_Object *json_object;
-            init_object = json_value_init_object();
-            json_object = json_value_get_object(init_object);
+            JSON_Value *json_value = json_value_init_object();
+            JSON_Object *json_object = json_value_get_object(json_value);
             json_object_set_string(json_object, "username", username);
             json_object_set_string(json_object, "password", password);
-            char *serialized_json = json_serialize_to_string_pretty(init_object);
+            char *serialized_string = json_serialize_to_string_pretty(json_value);
 
             /* Create the POST request */
             message = compute_post_request(
                 SERVER_HOST,
                 PATH_REGISTER,
                 PAYLOAD_TYPE, 
-                &serialized_json, 0, 
-                cookie, token);
+                &serialized_string, 0, 
+                NULL, NULL);
 
             /* Send the POST request */
             send_to_server(sockfd, message);
@@ -96,6 +94,8 @@ int main(int argc, char *argv[])
             /* Print the response */
             printf("User registered successfully!\n");
 
+            json_free_serialized_string(serialized_string);
+            json_value_free(json_value);
             free(username);
             free(password);
 
@@ -119,29 +119,25 @@ int main(int argc, char *argv[])
             password[strlen(password) - 1] = '\0';
 
             /* Create the JSON object */
-            JSON_Value *init_object;
-            JSON_Object *json_object;
-            init_object = json_value_init_object();
-            json_object = json_value_get_object(init_object);
+            JSON_Value *json_value = json_value_init_object();
+            JSON_Object *json_object = json_value_get_object(json_value);
             json_object_set_string(json_object, "username", username);
             json_object_set_string(json_object, "password", password);
-            char *serialized_json = json_serialize_to_string_pretty(init_object);
+            char *serialized_string = json_serialize_to_string_pretty(json_value);
             
             /* Create the POST request */
             message = compute_post_request(
                 SERVER_HOST,
                 PATH_LOGIN,
                 PAYLOAD_TYPE, 
-                &serialized_json, 0, 
-                cookie, token);
+                &serialized_string, 0, 
+                NULL, NULL);
 
             /* Send the POST request */
             send_to_server(sockfd, message);
 
             /* Receive the response */
             response = receive_from_server(sockfd);
-
-            printf("%s\n", response);
 
             /* Check if the credentials do not match */
             if (strstr(response, "{\"error\":\"Credentials are not good!\"}") != NULL) {
@@ -156,6 +152,10 @@ int main(int argc, char *argv[])
             cookie = strtok(strstr(response, "Set-Cookie:"), " ");
             cookie = strtok(NULL, ";");
 
+            token = NULL;
+
+            json_free_serialized_string(serialized_string);
+            json_value_free(json_value);
             free(username);
             free(password);
 
@@ -173,8 +173,6 @@ int main(int argc, char *argv[])
 
             /* Receive the response from the server */
             response = receive_from_server(sockfd);
-
-            printf("%s\n", response);
 
             /* Check if the logout was successful */
             if (strstr(response, "{\"error\":\"You are not logged in!\"}") != NULL) {
@@ -196,15 +194,13 @@ int main(int argc, char *argv[])
                 SERVER_HOST,
                 PATH_ACCESS,
                 NULL, 
-                cookie, token);
+                cookie, NULL);
 
             /* Send the request to the server */
             send_to_server(sockfd, message);
 
             /* Receive the response from the server */
             response = receive_from_server(sockfd);
-
-            printf("RESPONSE: %s\n", response);
 
             /* Check if the access was denied */
             if (strstr(response, "{\"error\":\"You are not logged in!\"}") != NULL) {
@@ -234,8 +230,6 @@ int main(int argc, char *argv[])
             /* Receive the response */
             response = receive_from_server(sockfd);
 
-            printf("RESPONSE: %s\n", response);
-
             /* Check if the client has access to the library */
             if (strstr(response, "{\"error\":\"Authorization header is missing!\"}") != NULL) {
                 printf("[ERROR] You do not have access to the library.\n");
@@ -243,9 +237,9 @@ int main(int argc, char *argv[])
             }
             
             /* Print the wanted result */
-            char *result = strtok(response, "[");
-            result = strtok(NULL, "]");
-            printf("[%s]\n", result);
+            char *result = strchr(response, '[');
+            JSON_Value *json_value = json_parse_string(result);
+            puts(json_serialize_to_string(json_value));
 
         /* Request information about a book */
         } else if (!strcmp(command, "get_book\n")) {
@@ -278,8 +272,6 @@ int main(int argc, char *argv[])
             /* Receive the response */
             response = receive_from_server(sockfd);
 
-            printf("RESPONSE: %s\n", response);
-
             /* Check if the client has access to the library */
             if (strstr(response, "{\"error\":\"Authorization header is missing!\"}") != NULL) {
                 printf("[ERROR] You do not have access to the library.\n");
@@ -299,9 +291,11 @@ int main(int argc, char *argv[])
             }
 
             /* Print the wanted result */
-            char *result = strtok(response, "{");
-            result = strtok(NULL, "}");
-            printf("{%s}\n", result);
+            char *result = strchr(response, '{');
+            JSON_Value *json_value = json_parse_string(result);
+            puts(json_serialize_to_string(json_value));
+            
+            free(id);
 
         /* Add a book */
         } else if (!strcmp(command, "add_book\n")) {
@@ -338,23 +332,21 @@ int main(int argc, char *argv[])
             page_count[strlen(page_count) - 1] = '\0';
 
             /* Create the json */
-            JSON_Value *init_object;
-            JSON_Object *json_object;
-            init_object = json_value_init_object();
-            json_object = json_value_get_object(init_object);
+            JSON_Value *json_value = json_value_init_object();;
+            JSON_Object *json_object = json_value_get_object(json_value);
             json_object_set_string(json_object, "title", title);
             json_object_set_string(json_object, "author", author);
             json_object_set_string(json_object, "genre", genre);
             json_object_set_string(json_object, "publisher", publisher);
             json_object_set_string(json_object, "page_count", page_count);
-            char *serialized_json = json_serialize_to_string_pretty(init_object);
+            char *serialized_string = json_serialize_to_string_pretty(json_value);
 
             /* Create the POST request */
             message = compute_post_request(
                 SERVER_HOST,
                 PATH_BOOKS,
                 PAYLOAD_TYPE, 
-                &serialized_json, 0, 
+                &serialized_string, 0, 
                 cookie, token);
 
             /* Send the request */
@@ -362,8 +354,6 @@ int main(int argc, char *argv[])
 
             /* Receive the response */
             response = receive_from_server(sockfd);
-
-            printf("RESPONSE: %s\n", response);
 
             /* Check if the client has access to the library */
             if (strstr(response, "{\"error\":\"Authorization header is missing!\"}") != NULL) {
@@ -381,6 +371,8 @@ int main(int argc, char *argv[])
             /* Print the response */
             printf("The book was succesfully added to the library.\n");
 
+            json_free_serialized_string(serialized_string);
+            json_value_free(json_value);
             free(title);
             free(author);
             free(genre);
@@ -416,8 +408,6 @@ int main(int argc, char *argv[])
 
             /* Receive the response */
             response = receive_from_server(sockfd);
-
-            printf("RESPONSE: %s\n", response);
 
             /* Check if the client has access to the library */
             if (strstr(response, "{\"error\":\"Authorization header is missing!\"}") != NULL) {
