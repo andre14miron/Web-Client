@@ -21,6 +21,61 @@
 #define MAX_STDIN       256
 #define MAX             1000
 
+char* get_user_infos() {
+    char *username;
+    char *password;
+    char *serialized_string;
+
+    /* Allocate memory for the data */
+    username = calloc(MAX_STDIN, sizeof(char));
+    password = calloc(MAX_STDIN, sizeof(char));
+    serialized_string = calloc(MAX_STDIN, sizeof(char));
+
+    /* Read the username and password */
+    printf("username=");
+    fgets(username, MAX_STDIN, stdin);
+    printf("password=");
+    fgets(password, MAX_STDIN, stdin);
+
+    /* Remove the new line from the end of the strings */
+    username[strlen(username) - 1] = '\0';
+    password[strlen(password) - 1] = '\0';
+
+    /* Create the JSON object */
+    JSON_Value *root_value = json_value_init_object();
+    JSON_Object *root_object = json_value_get_object(root_value);
+
+    /* Add the username and password to the JSON object */
+    json_object_set_string(root_object, "username", username);
+    json_object_set_string(root_object, "password", password);
+
+    /* Convert the JSON object to string */
+    serialized_string = json_serialize_to_string_pretty(root_value);
+
+    /* Free the memory */
+    free(username);
+    free(password);
+    json_value_free(root_value);
+
+    return serialized_string;
+}
+
+char* get_id() {
+    char *id;
+
+    /* Allocate memory for the data */
+    id = calloc(MAX_STDIN, sizeof(char));
+
+    /* Read the id */
+    printf("id=");
+    fgets(id, MAX_STDIN, stdin);
+
+    /* Remove the new line from the end of the string */
+    id[strlen(id) - 1] = '\0';
+
+    return id;
+}
+
 int main(int argc, char *argv[])
 {
     char *message;
@@ -47,29 +102,10 @@ int main(int argc, char *argv[])
 
         /* Perform the registration */
         } else if (!strcmp(command, "register\n")) {
-            char *username;
-            char *password;
+            char *serialized_string;
 
-            /* Allocate memory for the data */
-            username = calloc(MAX_STDIN, sizeof(char));
-            password = calloc(MAX_STDIN, sizeof(char));
-
-            /* Read the data from the user */
-            printf("username=");
-            fgets(username, MAX_STDIN, stdin);
-            printf("password=");
-            fgets(password, MAX_STDIN, stdin);
-
-            /* Remove the \n from the end of the string */
-            username[strlen(username) - 1] = '\0';
-            password[strlen(password) - 1] = '\0';
-
-            /* Create the JSON object */
-            JSON_Value *json_value = json_value_init_object();
-            JSON_Object *json_object = json_value_get_object(json_value);
-            json_object_set_string(json_object, "username", username);
-            json_object_set_string(json_object, "password", password);
-            char *serialized_string = json_serialize_to_string_pretty(json_value);
+            /* Get the user infos */
+            serialized_string = get_user_infos();
 
             /* Create the POST request */
             message = compute_post_request(
@@ -95,35 +131,13 @@ int main(int argc, char *argv[])
             printf("User registered successfully!\n");
 
             json_free_serialized_string(serialized_string);
-            json_value_free(json_value);
-            free(username);
-            free(password);
 
         /* Perform login */
         } else if (!strcmp(command, "login\n")) {
-            char *username;
-            char *password;
+            char *serialized_string;
 
-            /* Allocate memory for the data */
-            username = calloc(MAX_STDIN, sizeof(char));
-            password = calloc(MAX_STDIN, sizeof(char));
-
-            /* Read the data from the user */
-            printf("username=");
-            fgets(username, MAX_STDIN, stdin);
-            printf("password=");
-            fgets(password, MAX_STDIN, stdin);
-
-            /* Remove the \n from the end of the string */
-            username[strlen(username) - 1] = '\0';
-            password[strlen(password) - 1] = '\0';
-
-            /* Create the JSON object */
-            JSON_Value *json_value = json_value_init_object();
-            JSON_Object *json_object = json_value_get_object(json_value);
-            json_object_set_string(json_object, "username", username);
-            json_object_set_string(json_object, "password", password);
-            char *serialized_string = json_serialize_to_string_pretty(json_value);
+            /* Get the user infos */
+            serialized_string = get_user_infos();
             
             /* Create the POST request */
             message = compute_post_request(
@@ -155,9 +169,6 @@ int main(int argc, char *argv[])
             token = NULL;
 
             json_free_serialized_string(serialized_string);
-            json_value_free(json_value);
-            free(username);
-            free(password);
 
         /* Perform logout */
         } else if (!strcmp(command, "logout\n")) {
@@ -176,7 +187,7 @@ int main(int argc, char *argv[])
 
             /* Check if the logout was successful */
             if (strstr(response, "{\"error\":\"You are not logged in!\"}") != NULL) {
-                printf("[ERROR] Log out failed!\n");
+                printf("[ERROR] You are not logged in!\n");
                 continue;
             }
 
@@ -238,22 +249,36 @@ int main(int argc, char *argv[])
             
             /* Print the wanted result */
             char *result = strchr(response, '[');
-            JSON_Value *json_value = json_parse_string(result);
-            puts(json_serialize_to_string(json_value));
+            JSON_Value *root_value = json_parse_string(result);
+            JSON_Array *root_array = json_value_get_array(root_value);
+
+            if (json_array_get_count(root_array) == 0) {
+                printf("There are no books in the library.\n");
+                continue;
+            }
+
+            for (int i = 0; i < json_array_get_count(root_array); i++) {
+                JSON_Object *root_object = json_array_get_object(root_array, i);
+                const int id = json_object_get_number(root_object, "id");
+                const char *title = json_object_get_string(root_object, "title");
+                
+                printf("Book nr. #%d\nid=%d\ntitle=%s\n\n", i + 1, id, title);
+            }
+
+            json_value_free(root_value);
 
         /* Request information about a book */
         } else if (!strcmp(command, "get_book\n")) {
             char *id;
 
-            /* Allocate memory for the data */
-            id = calloc(MAX_STDIN, sizeof(char));
+            /* Get the ID from the user */
+            id = get_id();
 
-            /* Read the data from the user */
-            printf("id=");
-            fgets(id, MAX_STDIN, stdin);
-
-            /* Remove the \n from the end of the string */
-            id[strlen(id) - 1] = '\0';
+            /* Check if the user entered the ID */
+            if (strlen(id) == 0) {
+                printf("[ERROR] The ID was not entered.\n");
+                continue;
+            }
 
             /* Create the access path */
             char access_path[50] = "/api/v1/tema/library/books/";
@@ -284,7 +309,7 @@ int main(int argc, char *argv[])
                 continue;
             }
 
-            /* Check if the book was found */
+            /* Check if the book was not found */
             if (strstr(response, "{\"error\":\"No book was found!\"}") != NULL) {
                 printf("[ERROR] The book was not found.\n");
                 continue;
@@ -292,9 +317,22 @@ int main(int argc, char *argv[])
 
             /* Print the wanted result */
             char *result = strchr(response, '{');
-            JSON_Value *json_value = json_parse_string(result);
-            puts(json_serialize_to_string(json_value));
+            JSON_Value *root_value = json_parse_string(result);
+            JSON_Object *root_object = json_value_get_object(root_value);
+
+            const char *title = json_object_get_string(root_object, "title");
+            const char *author = json_object_get_string(root_object, "author");
+            const char *genre = json_object_get_string(root_object, "genre");
+            const char *publisher = json_object_get_string(root_object, "publisher");
+            const int page_count = json_object_get_number(root_object, "page_count");
+                
+            printf("title=%s\n", title);
+            printf("author=%s\n", author);
+            printf("genre=%s\n", genre);
+            printf("publisher=%s\n", publisher);
+            printf("page_count=%d\n", page_count);
             
+            json_value_free(root_value);
             free(id);
 
         /* Add a book */
@@ -323,6 +361,16 @@ int main(int argc, char *argv[])
             fgets(publisher, MAX_STDIN, stdin);
             printf("page_count=");
             fgets(page_count, MAX_STDIN, stdin);
+
+            /* Check if the user entered all the data */
+            if (strlen(title) == 1 || 
+                strlen(author) == 1 || 
+                strlen(genre) == 1 || 
+                strlen(publisher) == 1 || 
+                strlen(page_count) == 1) {
+                printf("[ERROR] You did not enter all the data.\n");
+                continue;
+            }
 
             /* Remove the \n from the end of the string */
             title[strlen(title) - 1] = '\0';
@@ -383,15 +431,14 @@ int main(int argc, char *argv[])
         } else if (!strcmp(command, "delete_book\n")) {
             char *id;
 
-            /* Allocate memory for the data */
-            id = calloc(MAX_STDIN, sizeof(char));
+            /* Get the ID from the user */
+            id = get_id();
 
-            /* Read the data from the user */
-            printf("id=");
-            fgets(id, MAX_STDIN, stdin);
-
-            /* Remove the \n from the end of the string */
-            id[strlen(id) - 1] = '\0';
+            /* Check if the user entered the ID */
+            if (strlen(id) == 0) {
+                printf("[ERROR] The ID was not entered.\n");
+                continue;
+            }
 
             /* Update the access path */
             char access_path[50] = "/api/v1/tema/library/books/";
