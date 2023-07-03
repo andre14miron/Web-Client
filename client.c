@@ -37,6 +37,10 @@ char* get_user_infos() {
     printf("password=");
     fgets(password, MAX_STDIN, stdin);
 
+    if (strchr(username, ' ') != NULL) {
+        return NULL;
+    }
+
     /* Remove the new line from the end of the strings */
     username[strlen(username) - 1] = '\0';
     password[strlen(password) - 1] = '\0';
@@ -106,6 +110,10 @@ int main(int argc, char *argv[])
 
             /* Get the user infos */
             serialized_string = get_user_infos();
+            if (serialized_string == NULL) {
+                printf("[ERROR] The username cannot contain spaces!\n");
+                continue;
+            }
 
             /* Create the POST request */
             message = compute_post_request(
@@ -138,6 +146,10 @@ int main(int argc, char *argv[])
 
             /* Get the user infos */
             serialized_string = get_user_infos();
+            if (serialized_string == NULL) {
+                printf("[ERROR] The username cannot contain spaces!\n");
+                continue;
+            }
             
             /* Create the POST request */
             message = compute_post_request(
