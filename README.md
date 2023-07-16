@@ -1,9 +1,9 @@
 # Web Client. Communication with REST API
 
-## The description
+## Description
 This project focuses on developing a C/C++ client application that interacts with a REST API. The client provides a command line interface (CLI) for users to input commands, which are then translated into requests sent to the server. The server, in this case, simulates a virtual library and exposes a REST API for various operations.
 
-## The structure
+## Structure
 The project consists of the following files:
 
 - **client.c**         : Implementation of the web client
@@ -14,7 +14,7 @@ The project consists of the following files:
 - **buffer.c**         : Implementation of buffer-related functions
 - **buffer.h**         : Header file for buffer-related functions
 
-## The main commands for User Input
+## Main commands for User Input
 The program reads each command in an infinite loop while opening a connection with the server. The accepted commands from the user include:
 
 1. **exit**: Terminate the program.
